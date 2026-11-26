@@ -12,6 +12,7 @@
   "bills.empty": "ยังไม่มีบิล กด \"บิลใหม่\" เพื่อเริ่มหาร",
   "bills.untitled": "บิลไม่มีชื่อ",
   "bills.people": "{n} คน",
+  "bills.duplicate": "ทำซ้ำ",
   "bills.confirmDelete": "ลบบิลนี้?",
   "editor.title": "แก้ไขบิล",
   "editor.billName": "ชื่อบิล",

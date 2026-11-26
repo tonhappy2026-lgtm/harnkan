@@ -62,5 +62,27 @@ describe('BillEditorPage', () => {
     const vatIncToggle = screen.getByRole('switch', { name: 'ราคารวม VAT แล้ว' })
     await user.click(vatIncToggle)
     await waitFor(() => expect(screen.getByTestId('editor-total')).toHaveTextContent('900.00'))
+
+    // Fix 1: Decimal discount typing ("12.50") must not wipe on '.'
+    const discToggle = screen.getByRole('switch', { name: 'ส่วนลด' })
+    await user.click(discToggle)
+    const discInput = screen.getByTestId('discount-input')
+    await user.type(discInput, '12.50')
+    await waitFor(() => expect(screen.getByTestId('editor-total')).toHaveTextContent('887.50'))
+
+    // Fix 3: Clearing qty and typing '2' yields qty 2 (not 12) -> 900*2 - 12.50 = 1,787.50
+    const qtyInput = screen.getByLabelText('จำนวน')
+    await user.clear(qtyInput)
+    await user.type(qtyInput, '2')
+    await waitFor(() => expect(screen.getByTestId('editor-total')).toHaveTextContent('1,787.50'))
+
+    // Fix 2: Deselecting B and C leaves A; clicking A again must not flip back to Everyone
+    await user.click(screen.getByRole('button', { name: 'B' }))
+    await user.click(screen.getByRole('button', { name: 'C' }))
+    const btnA = screen.getByRole('button', { name: 'A' })
+    expect(btnA).toHaveAttribute('aria-pressed', 'true')
+    await user.click(btnA)
+    expect(btnA).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'ทุกคน' })).toHaveAttribute('aria-pressed', 'false')
   })
 })

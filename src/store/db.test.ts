@@ -56,6 +56,9 @@ describe('backup', () => {
     await expect(importAll('{"app":"harnkan","version":1,"settings":{},"bills":[{"x":1}]}')).rejects.toThrow(
       'invalid-backup',
     )
+    await expect(
+      importAll('{"app":"harnkan","version":1,"settings":{"language":"fr"},"bills":[]}'),
+    ).rejects.toThrow('invalid-backup')
     expect((await listBills()).map((x) => x.id)).toEqual([a.id])
   })
 })

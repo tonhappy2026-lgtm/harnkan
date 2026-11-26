@@ -13,17 +13,21 @@ export default function SettingsPage({ onLangChange }: { onLangChange?: (lang: L
   const [settings, setSettings] = useState<Settings | null>(null)
   const [ppType, setPpType] = useState<PromptPayType>('phone')
   const [ppRaw, setPpRaw] = useState('')
+  const [scText, setScText] = useState('10')
+  const [vatText, setVatText] = useState('7')
   const [friendName, setFriendName] = useState('')
-  const [importMsg, setImportMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [importStatus, setImportStatus] = useState<'ok' | 'err' | null>(null)
+
+  function syncFromSettings(s: Settings) {
+    setSettings(s)
+    setPpType(s.promptPay?.type ?? 'phone')
+    setPpRaw(s.promptPay?.id ?? '')
+    setScText(String(s.defaults.scPercent))
+    setVatText(String(s.defaults.vatPercent))
+  }
 
   useEffect(() => {
-    getSettings().then((s) => {
-      setSettings(s)
-      if (s.promptPay) {
-        setPpType(s.promptPay.type)
-        setPpRaw(s.promptPay.id)
-      }
-    })
+    getSettings().then(syncFromSettings)
   }, [])
 
   if (!settings) return null
@@ -83,11 +87,13 @@ export default function SettingsPage({ onLangChange }: { onLangChange?: (lang: L
       const text = await file.text()
       await importAll(text)
       const s = await getSettings()
-      setSettings(s)
+      syncFromSettings(s)
       onLangChange?.(s.language)
-      setImportMsg({ ok: true, text: t('settings.importOk') })
+      setImportStatus('ok')
     } catch {
-      setImportMsg({ ok: false, text: t('settings.importError') })
+      setImportStatus('err')
+    } finally {
+      e.target.value = ''
     }
   }
 
@@ -137,7 +143,7 @@ export default function SettingsPage({ onLangChange }: { onLangChange?: (lang: L
           <div className="cell">
             <input
               className="input"
-              inputMode="numeric"
+              inputMode={ppType === 'phone' ? 'tel' : 'numeric'}
               placeholder={t('settings.promptPayId')}
               value={ppRaw}
               onChange={(e) => handlePpChange(ppType, e.target.value)}
@@ -178,13 +184,18 @@ export default function SettingsPage({ onLangChange }: { onLangChange?: (lang: L
                 className="input input-num"
                 style={{ maxWidth: 64 }}
                 inputMode="decimal"
-                value={String(settings.defaults.scPercent)}
-                onChange={(e) =>
-                  persist({
-                    ...settings,
-                    defaults: { ...settings.defaults, scPercent: Math.max(0, Number(e.target.value) || 0) },
-                  })
-                }
+                value={scText}
+                onChange={(e) => {
+                  const raw = e.target.value
+                  setScText(raw)
+                  const n = Number(raw)
+                  if (raw.trim() === '') {
+                    persist({ ...settings, defaults: { ...settings.defaults, scPercent: 0 } })
+                  } else if (Number.isFinite(n) && n >= 0) {
+                    persist({ ...settings, defaults: { ...settings.defaults, scPercent: n } })
+                  }
+                }}
+                onBlur={() => setScText(String(settings.defaults.scPercent))}
               />
             }
           />
@@ -195,13 +206,18 @@ export default function SettingsPage({ onLangChange }: { onLangChange?: (lang: L
                 className="input input-num"
                 style={{ maxWidth: 64 }}
                 inputMode="decimal"
-                value={String(settings.defaults.vatPercent)}
-                onChange={(e) =>
-                  persist({
-                    ...settings,
-                    defaults: { ...settings.defaults, vatPercent: Math.max(0, Number(e.target.value) || 0) },
-                  })
-                }
+                value={vatText}
+                onChange={(e) => {
+                  const raw = e.target.value
+                  setVatText(raw)
+                  const n = Number(raw)
+                  if (raw.trim() === '') {
+                    persist({ ...settings, defaults: { ...settings.defaults, vatPercent: 0 } })
+                  } else if (Number.isFinite(n) && n >= 0) {
+                    persist({ ...settings, defaults: { ...settings.defaults, vatPercent: n } })
+                  }
+                }}
+                onBlur={() => setVatText(String(settings.defaults.vatPercent))}
               />
             }
           />
@@ -219,9 +235,9 @@ export default function SettingsPage({ onLangChange }: { onLangChange?: (lang: L
               onChange={handleImport}
             />
           </label>
-          {importMsg && (
-            <div className="cell" style={{ color: importMsg.ok ? 'var(--green)' : 'var(--red)' }}>
-              {importMsg.text}
+          {importStatus && (
+            <div className="cell" style={{ color: importStatus === 'ok' ? 'var(--green)' : 'var(--red)' }}>
+              {importStatus === 'ok' ? t('settings.importOk') : t('settings.importError')}
             </div>
           )}
         </Section>

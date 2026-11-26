@@ -12,6 +12,7 @@
   "bills.empty": "No bills yet. Tap \"New Bill\" to start splitting.",
   "bills.untitled": "Untitled bill",
   "bills.people": "{n} people",
+  "bills.duplicate": "Duplicate",
   "bills.confirmDelete": "Delete this bill?",
   "editor.title": "Edit Bill",
   "editor.billName": "Bill name",

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { computeBill } from '../domain/calc'
-import { newBill } from '../domain/factory'
+import { newBill, uid } from '../domain/factory'
 import { formatBaht } from '../domain/money'
 import type { Bill } from '../domain/types'
 import { useT } from '../i18n'
@@ -23,6 +23,17 @@ export default function BillsPage() {
     const b = newBill([], s.defaults)
     await saveBill(b)
     nav(`/bill/${b.id}`)
+  }
+
+  async function handleDuplicate(b: Bill) {
+    const copy: Bill = {
+      ...b,
+      id: uid(),
+      createdAt: new Date().toISOString(),
+      paidIds: [],
+    }
+    await saveBill(copy)
+    setBills((prev) => [copy, ...prev])
   }
 
   async function handleDelete(id: string) {
@@ -67,9 +78,12 @@ export default function BillsPage() {
                   onClick={editing ? undefined : () => nav(`/bill/${b.id}`)}
                   accessory={
                     editing ? (
-                      <Button variant="destructive" onClick={() => handleDelete(b.id)}>
-                        {t('common.delete')}
-                      </Button>
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        <Button onClick={() => handleDuplicate(b)}>{t('bills.duplicate')}</Button>
+                        <Button variant="destructive" onClick={() => handleDelete(b.id)}>
+                          {t('common.delete')}
+                        </Button>
+                      </div>
                     ) : undefined
                   }
                 />

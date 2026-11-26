@@ -39,5 +39,21 @@ describe('SettingsPage', () => {
     const badFile = new File(['{"invalid":true}'], 'bad.json', { type: 'application/json' })
     await user.upload(fileInput, badFile)
     await waitFor(() => expect(screen.getByText('ไฟล์สำรองข้อมูลไม่ถูกต้อง')).toBeInTheDocument())
+
+    // Fix 6: Valid import updates PromptPay input field from imported settings
+    const goodPayload = JSON.stringify({
+      app: 'harnkan',
+      version: 1,
+      settings: {
+        language: 'th',
+        promptPay: { type: 'phone', id: '0899999999' },
+        friends: [],
+        defaults: { scPercent: 10, vatPercent: 7 },
+      },
+      bills: [],
+    })
+    const goodFile = new File([goodPayload], 'good.json', { type: 'application/json' })
+    await user.upload(fileInput, goodFile)
+    await waitFor(() => expect(input).toHaveValue('0899999999'))
   })
 })

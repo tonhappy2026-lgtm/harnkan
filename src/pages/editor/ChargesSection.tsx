@@ -1,14 +1,75 @@
+import { useEffect, useState } from 'react'
 import { parseBaht } from '../../domain/money'
 import type { Bill } from '../../domain/types'
 import { useT } from '../../i18n'
 import { Cell, Section, Segmented, Toggle } from '../../ui/kit'
 
+function NumberDraftInput({
+  value,
+  ariaLabel,
+  placeholder,
+  maxWidth,
+  onChange,
+}: {
+  value: number
+  ariaLabel: string
+  placeholder?: string
+  maxWidth?: number
+  onChange: (n: number) => void
+}) {
+  const [text, setText] = useState(() => (value > 0 ? String(value) : ''))
+  useEffect(() => {
+    const parsed = Number(text)
+    if (text !== '' && !text.endsWith('.') && parsed !== value) {
+      setText(value > 0 ? String(value) : '')
+    }
+  }, [value])
+
+  return (
+    <input
+      className="input input-num"
+      style={maxWidth ? { maxWidth } : undefined}
+      inputMode="decimal"
+      placeholder={placeholder ?? '0'}
+      aria-label={ariaLabel}
+      value={text}
+      onChange={(e) => {
+        const raw = e.target.value
+        setText(raw)
+        const n = Number(raw)
+        if (raw.trim() === '') onChange(0)
+        else if (Number.isFinite(n) && n >= 0) onChange(n)
+      }}
+      onBlur={() => setText(value > 0 ? String(value) : '0')}
+    />
+  )
+}
+
 export function ChargesSection({ bill, onChange }: { bill: Bill; onChange: (patch: Partial<Bill>) => void }) {
   const t = useT()
   const { serviceCharge: sc, vat, discount } = bill
 
-  const discDisplay =
-    discount.type === 'percent' ? String(discount.value) : discount.value > 0 ? String(discount.value / 100) : ''
+  const [discText, setDiscText] = useState(() =>
+    discount.type === 'percent'
+      ? discount.value > 0
+        ? String(discount.value)
+        : ''
+      : discount.value > 0
+        ? String(discount.value / 100)
+        : '',
+  )
+
+  useEffect(() => {
+    setDiscText(
+      discount.type === 'percent'
+        ? discount.value > 0
+          ? String(discount.value)
+          : ''
+        : discount.value > 0
+          ? String(discount.value / 100)
+          : '',
+    )
+  }, [discount.type])
 
   return (
     <Section header={t('editor.charges')}>
@@ -16,15 +77,11 @@ export function ChargesSection({ bill, onChange }: { bill: Bill; onChange: (patc
         label={t('editor.serviceCharge')}
         value={
           sc.enabled ? (
-            <input
-              className="input input-num"
-              style={{ maxWidth: 64 }}
-              inputMode="decimal"
-              aria-label="Service charge %"
-              value={String(sc.percent)}
-              onChange={(e) =>
-                onChange({ serviceCharge: { ...sc, percent: Math.max(0, Number(e.target.value) || 0) } })
-              }
+            <NumberDraftInput
+              value={sc.percent}
+              ariaLabel="Service charge %"
+              maxWidth={64}
+              onChange={(percent) => onChange({ serviceCharge: { ...sc, percent } })}
             />
           ) : undefined
         }
@@ -41,13 +98,11 @@ export function ChargesSection({ bill, onChange }: { bill: Bill; onChange: (patc
         label={t('editor.vat')}
         value={
           vat.enabled ? (
-            <input
-              className="input input-num"
-              style={{ maxWidth: 64 }}
-              inputMode="decimal"
-              aria-label="VAT %"
-              value={String(vat.percent)}
-              onChange={(e) => onChange({ vat: { ...vat, percent: Math.max(0, Number(e.target.value) || 0) } })}
+            <NumberDraftInput
+              value={vat.percent}
+              ariaLabel="VAT %"
+              maxWidth={64}
+              onChange={(percent) => onChange({ vat: { ...vat, percent } })}
             />
           ) : undefined
         }
@@ -101,12 +156,22 @@ export function ChargesSection({ bill, onChange }: { bill: Bill; onChange: (patc
             inputMode="decimal"
             placeholder="0"
             aria-label={t('editor.discount')}
-            value={discDisplay}
+            data-testid="discount-input"
+            value={discText}
             onChange={(e) => {
               const raw = e.target.value
-              const value =
-                discount.type === 'percent' ? Math.max(0, Number(raw) || 0) : (parseBaht(raw) ?? 0)
-              onChange({ discount: { ...discount, value } })
+              setDiscText(raw)
+              if (!raw.trim()) {
+                onChange({ discount: { ...discount, value: 0 } })
+                return
+              }
+              if (discount.type === 'percent') {
+                const n = Number(raw)
+                if (Number.isFinite(n) && n >= 0) onChange({ discount: { ...discount, value: n } })
+              } else {
+                const parsed = parseBaht(raw)
+                if (parsed !== null) onChange({ discount: { ...discount, value: parsed } })
+              }
             }}
           />
         </div>

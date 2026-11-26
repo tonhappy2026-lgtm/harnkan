@@ -41,6 +41,11 @@ export default function BillEditorPage() {
     setBill((prev) => (prev ? { ...prev, ...patch } : prev))
   }
 
+  async function goBack() {
+    if (bill) await saveBill(bill)
+    nav('/')
+  }
+
   async function goSummary() {
     if (!bill) return
     await saveBill(bill)
@@ -51,7 +56,7 @@ export default function BillEditorPage() {
     <div className="page">
       <NavBar
         title={t('editor.title')}
-        left={<Button onClick={() => nav('/')}>‹ {t('common.back')}</Button>}
+        left={<Button onClick={goBack}>‹ {t('common.back')}</Button>}
         right={
           <Button onClick={goSummary} disabled={bill.people.length === 0}>
             {t('editor.viewSummary')}

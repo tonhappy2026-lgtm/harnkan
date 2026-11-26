@@ -27,11 +27,40 @@ function MoneyInput({
       onChange={(e) => {
         const v = e.target.value
         setText(v)
+        if (!v.trim()) {
+          onChange(0)
+          return
+        }
         const parsed = parseBaht(v)
-        onChange(parsed ?? 0)
+        if (parsed !== null) onChange(parsed)
       }}
       onBlur={() => {
-        if (satang > 0) setText(formatBaht(satang).replace(/\.00$/, ''))
+        setText(satang > 0 ? formatBaht(satang).replace(/\.00$/, '') : '')
+      }}
+    />
+  )
+}
+
+function QtyInput({ qty, ariaLabel, onChange }: { qty: number; ariaLabel: string; onChange: (n: number) => void }) {
+  const [text, setText] = useState(() => String(qty))
+  return (
+    <input
+      className="input input-num"
+      style={{ maxWidth: 48 }}
+      inputMode="numeric"
+      aria-label={ariaLabel}
+      value={text}
+      onChange={(e) => {
+        const raw = e.target.value
+        setText(raw)
+        const n = parseInt(raw, 10)
+        if (Number.isFinite(n) && n >= 1) onChange(n)
+      }}
+      onBlur={() => {
+        const n = parseInt(text, 10)
+        const valid = Number.isFinite(n) && n >= 1 ? n : 1
+        onChange(valid)
+        setText(String(valid))
       }}
     />
   )
@@ -71,7 +100,8 @@ export function ItemsSection({ bill, onChange }: { bill: Bill; onChange: (patch:
     const current = item.consumerIds.length === 0 ? allIds : item.consumerIds.filter((id) => allIds.includes(id))
     const exists = current.includes(personId)
     const next = exists ? current.filter((id) => id !== personId) : [...current, personId]
-    // Keep exact array; if all selected, normalize to [] (everyone)
+    // Do not allow deselecting the last remaining person via chip toggle (prevents accidental flip to Everyone)
+    if (next.length === 0) return
     const normalized = next.length === allIds.length ? [] : next
     updateItem(item.id, { consumerIds: normalized })
   }
@@ -95,17 +125,7 @@ export function ItemsSection({ bill, onChange }: { bill: Bill; onChange: (patch:
                 ariaLabel={t('editor.price')}
                 onChange={(unitPrice) => updateItem(it.id, { unitPrice })}
               />
-              <input
-                className="input input-num"
-                style={{ maxWidth: 48 }}
-                inputMode="numeric"
-                aria-label={t('editor.qty')}
-                value={String(it.qty)}
-                onChange={(e) => {
-                  const n = Math.max(1, parseInt(e.target.value || '1', 10) || 1)
-                  updateItem(it.id, { qty: n })
-                }}
-              />
+              <QtyInput qty={it.qty} ariaLabel={t('editor.qty')} onChange={(qty) => updateItem(it.id, { qty })} />
               <Button variant="destructive" onClick={() => removeItem(it.id)}>
                 {t('common.delete')}
               </Button>
