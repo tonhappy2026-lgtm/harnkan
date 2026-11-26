@@ -88,7 +88,7 @@ export function ItemsSection({ bill, onChange }: { bill: Bill; onChange: (patch:
         const allSelected = it.consumerIds.length === 0
         return (
           <div key={it.id} className="cell" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
               <input
                 className="input"
                 placeholder={t('editor.itemName')}
@@ -97,9 +97,9 @@ export function ItemsSection({ bill, onChange }: { bill: Bill; onChange: (patch:
               />
               <MoneyInput
                 satang={it.unitPrice}
-                placeholder={`${t('editor.price')} (${t('common.baht')})`}
+                placeholder={t('editor.price')}
                 ariaLabel={t('editor.price')}
-                onChange={(unitPrice, ) => updateItem(it.id, { unitPrice, qty: 1 })}
+                onChange={(unitPrice) => updateItem(it.id, { unitPrice, qty: 1 })}
               />
               <Button variant="destructive" onClick={() => removeItem(it.id)}>
                 {t('common.delete')}

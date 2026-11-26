@@ -20,7 +20,7 @@ function PaidInput({
   return (
     <input
       className="input input-num input-box"
-      style={{ maxWidth: 115 }}
+      style={{ width: 92 }}
       inputMode="decimal"
       placeholder={placeholder}
       aria-label={ariaLabel}
