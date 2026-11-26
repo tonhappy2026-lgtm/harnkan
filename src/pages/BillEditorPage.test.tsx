@@ -45,7 +45,7 @@ describe('BillEditorPage', () => {
     await user.click(screen.getByText(/\+ เพิ่มรายการ/))
 
     const nameInput = screen.getByPlaceholderText('ชื่อเมนู')
-    const priceInput = screen.getByPlaceholderText('ราคา')
+    const priceInput = screen.getByLabelText('ราคา')
     await user.type(nameInput, 'หมูกระทะ')
     await user.clear(priceInput)
     await user.type(priceInput, '900')
@@ -70,10 +70,8 @@ describe('BillEditorPage', () => {
     await user.type(discInput, '12.50')
     await waitFor(() => expect(screen.getByTestId('editor-total')).toHaveTextContent('887.50'))
 
-    // Fix 3: Clearing qty and typing '2' yields qty 2 (not 12) -> 900*2 - 12.50 = 1,787.50
-    const qtyInput = screen.getByLabelText('จำนวน')
-    await user.clear(qtyInput)
-    await user.type(qtyInput, '2')
+    // Fix 3: Clicking qty '+' stepper increments qty to 2 -> 900*2 - 12.50 = 1,787.50
+    await user.click(screen.getByRole('button', { name: 'จำนวน +' }))
     await waitFor(() => expect(screen.getByTestId('editor-total')).toHaveTextContent('1,787.50'))
 
     // Fix 2: Deselecting B and C leaves A; clicking A again must not flip back to Everyone

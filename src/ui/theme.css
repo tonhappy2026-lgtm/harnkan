@@ -82,7 +82,11 @@ button.cell:active { background: var(--fill); }
 
 .input { border: none; background: transparent; outline: none; flex: 1; min-width: 0; padding: 4px 0; }
 .input-num { text-align: right; max-width: 110px; font-variant-numeric: tabular-nums; }
+.input-box { background: var(--fill); border-radius: 8px; padding: 6px 10px; }
 .input::placeholder { color: var(--label3); }
+.qty-stepper { display: inline-flex; align-items: center; background: var(--fill); border-radius: 8px; overflow: hidden; flex: none; }
+.qty-stepper button { border: none; background: none; padding: 6px 10px; font-weight: 600; color: var(--tint); }
+.qty-stepper span { min-width: 28px; text-align: center; font-size: 15px; font-variant-numeric: tabular-nums; }
 
 /* Toggle */
 .toggle { position: relative; width: 51px; height: 31px; flex: none; }

@@ -19,11 +19,12 @@ function MoneyInput({
   const [text, setText] = useState(() => (satang > 0 ? (satang / 100).toString() : ''))
   return (
     <input
-      className="input input-num"
+      className="input input-num input-box"
       inputMode="decimal"
       placeholder={placeholder}
       aria-label={ariaLabel}
       value={text}
+      onFocus={(e) => e.currentTarget.select()}
       onChange={(e) => {
         const v = e.target.value
         setText(v)
@@ -41,28 +42,17 @@ function MoneyInput({
   )
 }
 
-function QtyInput({ qty, ariaLabel, onChange }: { qty: number; ariaLabel: string; onChange: (n: number) => void }) {
-  const [text, setText] = useState(() => String(qty))
+function QtyStepper({ qty, ariaLabel, onChange }: { qty: number; ariaLabel: string; onChange: (n: number) => void }) {
   return (
-    <input
-      className="input input-num"
-      style={{ maxWidth: 48 }}
-      inputMode="numeric"
-      aria-label={ariaLabel}
-      value={text}
-      onChange={(e) => {
-        const raw = e.target.value
-        setText(raw)
-        const n = parseInt(raw, 10)
-        if (Number.isFinite(n) && n >= 1) onChange(n)
-      }}
-      onBlur={() => {
-        const n = parseInt(text, 10)
-        const valid = Number.isFinite(n) && n >= 1 ? n : 1
-        onChange(valid)
-        setText(String(valid))
-      }}
-    />
+    <div className="qty-stepper" role="group" aria-label={ariaLabel}>
+      <button type="button" aria-label={`${ariaLabel} -`} onClick={() => onChange(Math.max(1, qty - 1))}>
+        −
+      </button>
+      <span data-testid="item-qty">×{qty}</span>
+      <button type="button" aria-label={`${ariaLabel} +`} onClick={() => onChange(qty + 1)}>
+        +
+      </button>
+    </div>
   )
 }
 
@@ -121,11 +111,11 @@ export function ItemsSection({ bill, onChange }: { bill: Bill; onChange: (patch:
               />
               <MoneyInput
                 satang={it.unitPrice}
-                placeholder={t('editor.price')}
+                placeholder={`${t('editor.price')} (${t('common.baht')})`}
                 ariaLabel={t('editor.price')}
                 onChange={(unitPrice) => updateItem(it.id, { unitPrice })}
               />
-              <QtyInput qty={it.qty} ariaLabel={t('editor.qty')} onChange={(qty) => updateItem(it.id, { qty })} />
+              <QtyStepper qty={it.qty} ariaLabel={t('editor.qty')} onChange={(qty) => updateItem(it.id, { qty })} />
               <Button variant="destructive" onClick={() => removeItem(it.id)}>
                 {t('common.delete')}
               </Button>
