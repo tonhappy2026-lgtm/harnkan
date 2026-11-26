@@ -93,9 +93,10 @@ describe('computeBill', () => {
     expect(r.shares).toEqual({ A: 45000, B: 45000, C: 0 })
   })
 
-  test('no people gives empty shares', () => {
+  test('no people still computes bill subtotal and total (shares empty)', () => {
     const r = computeBill({ ...base(), people: [] })
-    expect(r.total).toBe(0)
+    expect(r.subtotal).toBe(120000)
+    expect(r.total).toBe(141240)
     expect(r.shares).toEqual({})
   })
 })

@@ -85,4 +85,35 @@ describe('BillEditorPage', () => {
     expect(btnA).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByRole('button', { name: 'ทุกคน' })).toHaveAttribute('aria-pressed', 'false')
   })
+
+  test('computes total immediately even before adding people, and auto-adds typed person name on blur', async () => {
+    const bill = {
+      ...newBill([], { scPercent: 10, vatPercent: 7 }),
+      id: 'b2',
+      mode: 'equal' as const,
+    }
+    await saveBill(bill)
+
+    const user = userEvent.setup()
+    render(
+      <I18nProvider lang="th">
+        <MemoryRouter initialEntries={['/bill/b2']}>
+          <Routes>
+            <Route path="/bill/:id" element={<BillEditorPage />} />
+          </Routes>
+        </MemoryRouter>
+      </I18nProvider>,
+    )
+
+    const amountInput = await screen.findByLabelText('ยอดอาหาร (บาท)')
+    await user.type(amountInput, '1000')
+    // 1000 + 10% SC (100) + 7% VAT (77) = 1,177.00 even with 0 people
+    await waitFor(() => expect(screen.getByTestId('editor-total')).toHaveTextContent('1,177.00'))
+
+    // Typing a person name and blurring (tapping elsewhere) auto-adds the person
+    const personInput = screen.getByPlaceholderText('ชื่อ')
+    await user.type(personInput, 'ต้น')
+    await user.tab()
+    await waitFor(() => expect(screen.getByText('ต้น')).toBeInTheDocument())
+  })
 })

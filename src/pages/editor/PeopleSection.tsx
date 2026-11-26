@@ -76,6 +76,9 @@ export function PeopleSection({
           placeholder={t('editor.personPlaceholder')}
           value={name}
           onChange={(e) => setName(e.target.value)}
+          onBlur={() => {
+            if (name.trim()) addPersonByName(name)
+          }}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               e.preventDefault()
