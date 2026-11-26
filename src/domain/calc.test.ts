@@ -100,6 +100,21 @@ describe('computeBill', () => {
     expect(r.shares).toEqual({})
   })
 
+  test('three 1,000 THB items split 3 ways give exact 1,000.00 each without rounding drift', () => {
+    const r = computeBill({
+      ...base(),
+      items: [
+        { id: '1', name: 'A', unitPrice: 100000, qty: 1, consumerIds: [] },
+        { id: '2', name: 'B', unitPrice: 100000, qty: 1, consumerIds: [] },
+        { id: '3', name: 'C', unitPrice: 100000, qty: 1, consumerIds: [] },
+      ],
+      serviceCharge: { enabled: false, percent: 10 },
+      vat: { enabled: false, percent: 7, inclusive: false },
+    })
+    expect(r.total).toBe(300000)
+    expect(r.shares).toEqual({ A: 100000, B: 100000, C: 100000 })
+  })
+
   test('multi-payer paidAmounts computes who transfers how much to whom', () => {
     // Total 1,412.40 (141240 satang); shares: A=529.65, B=529.65, C=353.10
     // Suppose A paid 1,000.00 (100000) and B paid 412.40 (41240), C paid 0

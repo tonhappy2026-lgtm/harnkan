@@ -3,6 +3,21 @@ import type { Bill, BillResult, Settlement } from './types'
 
 const pct = (amount: Satang, percent: number) => Math.round((amount * percent) / 100)
 
+function gcd(a: number, b: number): number {
+  let x = Math.abs(a)
+  let y = Math.abs(b)
+  while (y !== 0) {
+    const t = x % y
+    x = y
+    y = t
+  }
+  return x || 1
+}
+
+function lcm(a: number, b: number): number {
+  return (a / gcd(a, b)) * b
+}
+
 /**
  * Compute minimal transfer list from net balances (paid - share).
  * Debtors (net < 0) pay creditors (net > 0).
@@ -38,20 +53,26 @@ export function computeBill(bill: Bill): BillResult {
   const valid = new Set(ids)
   const personSubtotals: Record<string, Satang> = Object.fromEntries(ids.map((id) => [id, 0]))
   const unassignedItemIds: string[] = []
-  let rawSubtotal: Satang = 0
+  let subtotal: Satang = 0
+
+  // Accumulate exact integer weights using common denominator across all assigned items
+  // so repeated divisions (e.g. three 1,000 THB items split 3 ways) never accumulate 1-satang rounding drift.
+  const exactWeights: Record<string, number> = Object.fromEntries(ids.map((id) => [id, 0]))
 
   if (bill.mode === 'equal') {
-    rawSubtotal = Math.max(0, bill.equalTotal)
+    subtotal = Math.max(0, bill.equalTotal)
     if (ids.length > 0) {
-      allocate(rawSubtotal, ids.map(() => 1)).forEach((v, i) => {
-        personSubtotals[ids[i]] += v
+      for (const id of ids) exactWeights[id] = 1
+      allocate(subtotal, ids.map(() => 1)).forEach((v, i) => {
+        personSubtotals[ids[i]] = v
       })
     }
   } else {
+    const assignedItems: { line: Satang; consumers: string[] }[] = []
     for (const item of bill.items) {
       const line = Math.max(0, Math.round(item.unitPrice))
       if (ids.length === 0) {
-        rawSubtotal += line
+        subtotal += line
         continue
       }
       let consumers = item.consumerIds.length === 0 ? ids : item.consumerIds.filter((id) => valid.has(id))
@@ -59,15 +80,49 @@ export function computeBill(bill: Bill): BillResult {
         unassignedItemIds.push(item.id)
         continue
       }
-      rawSubtotal += line
+      subtotal += line
       consumers = ids.filter((id) => consumers.includes(id)) // keep bill order, dedupe
-      allocate(line, consumers.map(() => 1)).forEach((v, i) => {
-        personSubtotals[consumers[i]] += v
+      assignedItems.push({ line, consumers })
+    }
+
+    if (ids.length > 0 && assignedItems.length > 0) {
+      // Compute LCM of consumer counts (or fall back to floating weights if LCM would overflow safe int)
+      let denom = 1
+      let exact = true
+      for (const it of assignedItems) {
+        const next = lcm(denom, it.consumers.length)
+        if (!Number.isSafeInteger(next) || next > 1e9) {
+          exact = false
+          break
+        }
+        denom = next
+      }
+
+      if (exact) {
+        for (const it of assignedItems) {
+          const mul = denom / it.consumers.length
+          for (const cid of it.consumers) {
+            exactWeights[cid] += it.line * mul
+          }
+        }
+      } else {
+        for (const it of assignedItems) {
+          const share = it.line / it.consumers.length
+          for (const cid of it.consumers) {
+            exactWeights[cid] += share
+          }
+        }
+      }
+
+      allocate(
+        subtotal,
+        ids.map((id) => exactWeights[id]),
+      ).forEach((v, i) => {
+        personSubtotals[ids[i]] = v
       })
     }
   }
 
-  const subtotal = ids.length > 0 ? ids.reduce((a, id) => a + personSubtotals[id], 0) : rawSubtotal
   const d = bill.discount
   const rawDiscount = !d.enabled ? 0 : d.type === 'percent' ? pct(subtotal, d.value) : Math.round(d.value)
   const discount = Math.min(Math.max(0, rawDiscount), subtotal)
@@ -81,7 +136,10 @@ export function computeBill(bill: Bill): BillResult {
 
   const shares: Record<string, Satang> = {}
   if (ids.length > 0) {
-    allocate(total, ids.map((id) => personSubtotals[id])).forEach((v, i) => {
+    allocate(
+      total,
+      ids.map((id) => exactWeights[id]),
+    ).forEach((v, i) => {
       shares[ids[i]] = v
     })
   }
@@ -101,7 +159,7 @@ export function computeBill(bill: Bill): BillResult {
   const totalPaid = ids.reduce((s, id) => s + (paidByPerson[id] ?? 0), 0)
 
   // To ensure settlements always close even if user entered partial advances < total,
-  // any remaining unpaid difference (total - totalPaid) is attributed to defaultPayer (or split if overpaid).
+  // any remaining unpaid difference (total - totalPaid) is attributed to defaultPayer.
   const effectivePaid: Record<string, Satang> = { ...paidByPerson }
   if (ids.length > 0 && customPaidSum > 0 && totalPaid !== total && defaultPayer) {
     effectivePaid[defaultPayer] = Math.max(0, (effectivePaid[defaultPayer] ?? 0) + (total - totalPaid))
