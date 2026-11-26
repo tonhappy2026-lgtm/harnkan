@@ -99,6 +99,21 @@ describe('computeBill', () => {
     expect(r.total).toBe(141240)
     expect(r.shares).toEqual({})
   })
+
+  test('multi-payer paidAmounts computes who transfers how much to whom', () => {
+    // Total 1,412.40 (141240 satang); shares: A=529.65, B=529.65, C=353.10
+    // Suppose A paid 1,000.00 (100000) and B paid 412.40 (41240), C paid 0
+    const r = computeBill({
+      ...base(),
+      paidAmounts: { A: 100000, B: 41240, C: 0 },
+    })
+    // Net: A = +470.35 (47035), B = -117.25 (-11725), C = -353.10 (-35310)
+    // C pays A 353.10, B pays A 117.25
+    expect(r.settlements).toEqual([
+      { fromId: 'C', toId: 'A', amount: 35310 },
+      { fromId: 'B', toId: 'A', amount: 11725 },
+    ])
+  })
 })
 
 describe('newBill', () => {

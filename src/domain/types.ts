@@ -25,6 +25,8 @@ export interface Bill {
   mode: SplitMode
   people: Person[]
   payerId: string
+  /** Optional map of personId -> amount already paid at the restaurant (satang). */
+  paidAmounts?: Record<string, Satang>
   equalTotal: Satang
   items: Item[]
   serviceCharge: { enabled: boolean; percent: number }
@@ -43,6 +45,12 @@ export interface Settings {
   defaults: { scPercent: number; vatPercent: number }
 }
 
+export interface Settlement {
+  fromId: string
+  toId: string
+  amount: Satang
+}
+
 export interface BillResult {
   subtotal: Satang
   discount: Satang
@@ -52,5 +60,9 @@ export interface BillResult {
   total: Satang
   personSubtotals: Record<string, Satang>
   shares: Record<string, Satang>
+  paidByPerson: Record<string, Satang>
+  totalPaid: Satang
+  netBalances: Record<string, Satang>
+  settlements: Settlement[]
   unassignedItemIds: string[]
 }

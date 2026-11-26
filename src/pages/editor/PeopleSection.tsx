@@ -1,8 +1,47 @@
 import { useState } from 'react'
 import { newPerson } from '../../domain/factory'
+import { formatBaht, parseBaht, type Satang } from '../../domain/money'
 import type { Bill, Person } from '../../domain/types'
 import { useT } from '../../i18n'
-import { Button, Cell, Section } from '../../ui/kit'
+import { Button, Section } from '../../ui/kit'
+
+function PaidInput({
+  satang,
+  placeholder,
+  ariaLabel,
+  onChange,
+}: {
+  satang: Satang
+  placeholder: string
+  ariaLabel: string
+  onChange: (s: Satang) => void
+}) {
+  const [text, setText] = useState(() => (satang > 0 ? (satang / 100).toString() : ''))
+  return (
+    <input
+      className="input input-num input-box"
+      style={{ maxWidth: 115 }}
+      inputMode="decimal"
+      placeholder={placeholder}
+      aria-label={ariaLabel}
+      value={text}
+      onFocus={(e) => e.currentTarget.select()}
+      onChange={(e) => {
+        const v = e.target.value
+        setText(v)
+        if (!v.trim()) {
+          onChange(0)
+          return
+        }
+        const parsed = parseBaht(v)
+        if (parsed !== null) onChange(parsed)
+      }}
+      onBlur={() => {
+        setText(satang > 0 ? formatBaht(satang).replace(/\.00$/, '') : '')
+      }}
+    />
+  )
+}
 
 export function PeopleSection({
   bill,
@@ -37,37 +76,48 @@ export function PeopleSection({
     const people = bill.people.filter((p) => p.id !== id)
     const payerId = bill.payerId === id ? (people[0]?.id ?? '') : bill.payerId
     const paidIds = bill.paidIds.filter((pid) => pid !== id)
-    onChange({ people, payerId, paidIds })
+    const paidAmounts = { ...(bill.paidAmounts ?? {}) }
+    delete paidAmounts[id]
+    onChange({ people, payerId, paidIds, paidAmounts })
+  }
+
+  function setPersonPaid(personId: string, amount: Satang) {
+    const paidAmounts = { ...(bill.paidAmounts ?? {}), [personId]: amount }
+    onChange({ paidAmounts })
   }
 
   const unusedFriends = friends.filter((f) => !bill.people.some((p) => p.id === f.id || p.name === f.name))
 
   return (
-    <Section header={t('editor.people')}>
+    <Section header={t('editor.people')} footer={bill.people.length > 0 ? t('editor.paidHint') : undefined}>
       {bill.people.map((p) => {
         const isPayer = bill.payerId === p.id
+        const paidSatang = bill.paidAmounts?.[p.id] ?? 0
         return (
-          <Cell
-            key={p.id}
-            leading={
-              <button
-                type="button"
-                className="btn"
-                aria-label={`${t('editor.setPayer')} ${p.name}`}
-                onClick={() => onChange({ payerId: p.id })}
-                style={{ padding: '4px 6px' }}
-              >
-                <span className={isPayer ? 'payer-star' : 'muted'}>{isPayer ? '★' : '☆'}</span>
-              </button>
-            }
-            label={p.name}
-            sub={isPayer ? t('editor.payer') : undefined}
-            accessory={
-              <Button variant="destructive" onClick={() => removePerson(p.id)}>
-                {t('common.delete')}
-              </Button>
-            }
-          />
+          <div key={p.id} className="cell">
+            <button
+              type="button"
+              className="btn"
+              aria-label={`${t('editor.setPayer')} ${p.name}`}
+              onClick={() => onChange({ payerId: p.id })}
+              style={{ padding: '4px 6px' }}
+            >
+              <span className={isPayer ? 'payer-star' : 'muted'}>{isPayer ? '★' : '☆'}</span>
+            </button>
+            <div className="cell-label">
+              <div>{p.name}</div>
+              {isPayer && <div className="cell-sub">{t('editor.payer')}</div>}
+            </div>
+            <PaidInput
+              satang={paidSatang}
+              placeholder={t('editor.paidAmount')}
+              ariaLabel={`${t('editor.paidAmount')} ${p.name}`}
+              onChange={(amt) => setPersonPaid(p.id, amt)}
+            />
+            <Button variant="destructive" onClick={() => removePerson(p.id)}>
+              {t('common.delete')}
+            </Button>
+          </div>
         )
       })}
       <div className="cell">

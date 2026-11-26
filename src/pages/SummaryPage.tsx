@@ -4,7 +4,7 @@ import QRCode from 'qrcode'
 import { computeBill } from '../domain/calc'
 import { formatBaht } from '../domain/money'
 import { buildPromptPayPayload } from '../domain/promptpay'
-import type { Bill, Person, Settings } from '../domain/types'
+import type { Bill, Settings, Settlement } from '../domain/types'
 import { useT } from '../i18n'
 import { shareImage } from '../share/shareImage'
 import { buildShareText } from '../share/shareText'
@@ -17,7 +17,7 @@ export default function SummaryPage() {
   const t = useT()
   const [bill, setBill] = useState<Bill | null>(null)
   const [settings, setSettings] = useState<Settings | null>(null)
-  const [qrPerson, setQrPerson] = useState<Person | null>(null)
+  const [qrSettlement, setQrSettlement] = useState<Settlement | null>(null)
   const [qrDataUrl, setQrDataUrl] = useState<string>('')
   const [copied, setCopied] = useState(false)
   const cardRef = useRef<HTMLDivElement>(null)
@@ -29,30 +29,31 @@ export default function SummaryPage() {
   }, [id])
 
   useEffect(() => {
-    if (!qrPerson || !bill || !settings?.promptPay) {
+    if (!qrSettlement || !settings?.promptPay) {
       setQrDataUrl('')
       return
     }
-    const r = computeBill(bill)
-    const amt = r.shares[qrPerson.id] ?? 0
-    const payload = buildPromptPayPayload(settings.promptPay.type, settings.promptPay.id, amt)
+    const payload = buildPromptPayPayload(settings.promptPay.type, settings.promptPay.id, qrSettlement.amount)
     QRCode.toDataURL(payload, { margin: 1, width: 480 }).then(setQrDataUrl).catch(() => setQrDataUrl(''))
-  }, [qrPerson, bill, settings])
+  }, [qrSettlement, settings])
 
   if (!bill || !settings) return null
 
   const result = computeBill(bill)
-  const payer = bill.people.find((p) => p.id === bill.payerId)
+  const nameOf = (pid: string) => bill.people.find((p) => p.id === pid)?.name ?? pid
 
-  const outstanding = bill.people.reduce((sum, p) => {
-    if (p.id === bill.payerId || bill.paidIds.includes(p.id)) return sum
-    return sum + (result.shares[p.id] ?? 0)
-  }, 0)
+  const isSettled = (s: Settlement) =>
+    bill.paidIds.includes(`${s.fromId}->${s.toId}`) || bill.paidIds.includes(s.fromId)
 
-  async function togglePaid(personId: string) {
+  const outstanding = result.settlements.reduce((sum, s) => (isSettled(s) ? sum : sum + s.amount), 0)
+
+  async function toggleSettlementPaid(s: Settlement) {
     if (!bill) return
-    const exists = bill.paidIds.includes(personId)
-    const paidIds = exists ? bill.paidIds.filter((x) => x !== personId) : [...bill.paidIds, personId]
+    const key = `${s.fromId}->${s.toId}`
+    const already = isSettled(s)
+    const paidIds = already
+      ? bill.paidIds.filter((x) => x !== key && x !== s.fromId)
+      : [...bill.paidIds, key]
     const next = { ...bill, paidIds }
     setBill(next)
     await saveBill(next)
@@ -89,17 +90,16 @@ export default function SummaryPage() {
             {t('app.name')} · {bill.createdAt.slice(0, 10)}
           </div>
           {bill.people.map((p) => {
-            const isPayer = p.id === bill.payerId
-            const isPaid = isPayer || bill.paidIds.includes(p.id)
+            const paidAmt = result.paidByPerson[p.id] ?? 0
             return (
               <div key={p.id} className="share-row">
                 <span>
                   {p.name}{' '}
-                  {isPayer ? (
-                    <span className="muted">({t('summary.payer')})</span>
-                  ) : isPaid ? (
-                    <span className="paid">({t('summary.paid')})</span>
-                  ) : null}
+                  {paidAmt > 0 && (
+                    <span className="muted">
+                      ({t('summary.alreadyPaid')} {formatBaht(paidAmt)})
+                    </span>
+                  )}
                 </span>
                 <span>{formatBaht(result.shares[p.id] ?? 0)}</span>
               </div>
@@ -109,44 +109,75 @@ export default function SummaryPage() {
             <span>{t('summary.total')}</span>
             <span>{formatBaht(result.total)}</span>
           </div>
-          {payer && (
-            <div className="cell-sub" style={{ marginTop: 8 }}>
-              {t('share.payTo', { name: payer.name })}
+          {result.settlements.length > 0 && (
+            <div style={{ marginTop: 12, paddingTop: 10, borderTop: '0.5px solid var(--sep)' }}>
+              <div className="cell-sub" style={{ marginBottom: 6, fontWeight: 600 }}>
+                {t('summary.settlements')}
+              </div>
+              {result.settlements.map((s) => {
+                const done = isSettled(s)
+                return (
+                  <div key={`${s.fromId}->${s.toId}`} className="share-row">
+                    <span className={done ? 'strike' : ''}>
+                      {t('summary.transferTo', { from: nameOf(s.fromId), to: nameOf(s.toId) })}
+                    </span>
+                    <span className={done ? 'paid' : ''}>{formatBaht(s.amount)}</span>
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>
 
-        <Section header={t('summary.perPerson')} footer={t('summary.tapForQr')}>
-          {bill.people.map((p) => {
-            const isPayer = p.id === bill.payerId
-            const isPaid = isPayer || bill.paidIds.includes(p.id)
-            const amt = result.shares[p.id] ?? 0
-            return (
-              <div key={p.id} className="cell">
-                {!isPayer && (
+        <Section header={t('summary.settlements')} footer={t('summary.tapForQr')}>
+          {result.settlements.length === 0 ? (
+            <Cell label={<span className="muted">{t('summary.allSettled')}</span>} />
+          ) : (
+            result.settlements.map((s) => {
+              const done = isSettled(s)
+              const fromName = nameOf(s.fromId)
+              const toName = nameOf(s.toId)
+              return (
+                <div key={`${s.fromId}->${s.toId}`} className="cell">
                   <button
                     type="button"
                     role="checkbox"
-                    aria-checked={isPaid}
-                    aria-label={`${t('summary.paid')} ${p.name}`}
+                    aria-checked={done}
+                    aria-label={`${t('summary.paid')} ${fromName}`}
                     className="check"
-                    onClick={() => togglePaid(p.id)}
+                    onClick={() => toggleSettlementPaid(s)}
                   >
-                    {isPaid ? '✓' : ''}
+                    {done ? '✓' : ''}
                   </button>
-                )}
-                <button
-                  type="button"
-                  className="btn"
-                  style={{ flex: 1, textAlign: 'left', padding: '4px 0', color: 'inherit' }}
-                  onClick={() => !isPayer && setQrPerson(p)}
-                  disabled={isPayer}
-                >
-                  <div className={isPaid && !isPayer ? 'strike' : ''}>{p.name}</div>
-                  <div className="cell-sub">{isPayer ? t('summary.payer') : isPaid ? t('summary.paid') : ''}</div>
-                </button>
-                <div className="cell-value">{formatBaht(amt)}</div>
-              </div>
+                  <button
+                    type="button"
+                    className="btn"
+                    style={{ flex: 1, textAlign: 'left', padding: '4px 0', color: 'inherit' }}
+                    onClick={() => setQrSettlement(s)}
+                  >
+                    <div className={done ? 'strike' : ''}>
+                      {t('summary.transferTo', { from: fromName, to: toName })}
+                    </div>
+                    <div className="cell-sub">{done ? t('summary.paid') : ''}</div>
+                  </button>
+                  <div className="cell-value">{formatBaht(s.amount)}</div>
+                </div>
+              )
+            })
+          )}
+        </Section>
+
+        <Section header={t('summary.perPerson')}>
+          {bill.people.map((p) => {
+            const share = result.shares[p.id] ?? 0
+            const paidAmt = result.paidByPerson[p.id] ?? 0
+            return (
+              <Cell
+                key={p.id}
+                label={p.name}
+                sub={`${t('summary.ate')} ${formatBaht(share)} · ${t('summary.alreadyPaid')} ${formatBaht(paidAmt)}`}
+                value={formatBaht(share)}
+              />
             )
           })}
         </Section>
@@ -183,14 +214,16 @@ export default function SummaryPage() {
         </div>
       </div>
 
-      <Sheet open={qrPerson !== null} onClose={() => setQrPerson(null)}>
-        {qrPerson && (
+      <Sheet open={qrSettlement !== null} onClose={() => setQrSettlement(null)}>
+        {qrSettlement && (
           <div className="center">
-            <h3 style={{ margin: '4px 0' }}>{qrPerson.name}</h3>
-            <div className="total-value">{formatBaht(result.shares[qrPerson.id] ?? 0)}</div>
+            <h3 style={{ margin: '4px 0' }}>
+              {t('summary.transferTo', { from: nameOf(qrSettlement.fromId), to: nameOf(qrSettlement.toId) })}
+            </h3>
+            <div className="total-value">{formatBaht(qrSettlement.amount)}</div>
             {settings.promptPay ? (
               <>
-                {payer && <div className="cell-sub">{t('summary.scanToPay', { name: payer.name })}</div>}
+                <div className="cell-sub">{t('summary.scanToPay', { name: nameOf(qrSettlement.toId) })}</div>
                 {qrDataUrl && <img className="qr" src={qrDataUrl} alt="PromptPay QR" />}
                 <div className="cell-sub">{settings.promptPay.id}</div>
               </>

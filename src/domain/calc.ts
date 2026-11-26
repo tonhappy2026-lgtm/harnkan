@@ -1,7 +1,37 @@
 import { allocate, type Satang } from './money'
-import type { Bill, BillResult } from './types'
+import type { Bill, BillResult, Settlement } from './types'
 
 const pct = (amount: Satang, percent: number) => Math.round((amount * percent) / 100)
+
+/**
+ * Compute minimal transfer list from net balances (paid - share).
+ * Debtors (net < 0) pay creditors (net > 0).
+ */
+export function computeSettlements(ids: string[], netBalances: Record<string, Satang>): Settlement[] {
+  const debtors = ids
+    .filter((id) => (netBalances[id] ?? 0) < 0)
+    .map((id) => ({ id, amt: -(netBalances[id] ?? 0) }))
+    .sort((a, b) => b.amt - a.amt)
+  const creditors = ids
+    .filter((id) => (netBalances[id] ?? 0) > 0)
+    .map((id) => ({ id, amt: netBalances[id] ?? 0 }))
+    .sort((a, b) => b.amt - a.amt)
+
+  const settlements: Settlement[] = []
+  let i = 0
+  let j = 0
+  while (i < debtors.length && j < creditors.length) {
+    const pay = Math.min(debtors[i].amt, creditors[j].amt)
+    if (pay > 0) {
+      settlements.push({ fromId: debtors[i].id, toId: creditors[j].id, amount: pay })
+    }
+    debtors[i].amt -= pay
+    creditors[j].amt -= pay
+    if (debtors[i].amt === 0) i++
+    if (creditors[j].amt === 0) j++
+  }
+  return settlements
+}
 
 export function computeBill(bill: Bill): BillResult {
   const ids = bill.people.map((p) => p.id)
@@ -56,5 +86,47 @@ export function computeBill(bill: Bill): BillResult {
     })
   }
 
-  return { subtotal, discount, serviceCharge, vatAdded, vatIncluded, total, personSubtotals, shares, unassignedItemIds }
+  // Paid amounts per person: if any custom paidAmounts > 0 exist, use them; otherwise default to payerId paying `total`.
+  const rawPaidMap = bill.paidAmounts ?? {}
+  const customPaidSum = ids.reduce((s, id) => s + Math.max(0, Math.round(rawPaidMap[id] ?? 0)), 0)
+  const paidByPerson: Record<string, Satang> = {}
+  const defaultPayer = valid.has(bill.payerId) ? bill.payerId : (ids[0] ?? '')
+  for (const id of ids) {
+    if (customPaidSum > 0) {
+      paidByPerson[id] = Math.max(0, Math.round(rawPaidMap[id] ?? 0))
+    } else {
+      paidByPerson[id] = id === defaultPayer ? total : 0
+    }
+  }
+  const totalPaid = ids.reduce((s, id) => s + (paidByPerson[id] ?? 0), 0)
+
+  // To ensure settlements always close even if user entered partial advances < total,
+  // any remaining unpaid difference (total - totalPaid) is attributed to defaultPayer (or split if overpaid).
+  const effectivePaid: Record<string, Satang> = { ...paidByPerson }
+  if (ids.length > 0 && customPaidSum > 0 && totalPaid !== total && defaultPayer) {
+    effectivePaid[defaultPayer] = Math.max(0, (effectivePaid[defaultPayer] ?? 0) + (total - totalPaid))
+  }
+
+  const netBalances: Record<string, Satang> = {}
+  for (const id of ids) {
+    netBalances[id] = (effectivePaid[id] ?? 0) - (shares[id] ?? 0)
+  }
+
+  const settlements = computeSettlements(ids, netBalances)
+
+  return {
+    subtotal,
+    discount,
+    serviceCharge,
+    vatAdded,
+    vatIncluded,
+    total,
+    personSubtotals,
+    shares,
+    paidByPerson,
+    totalPaid: customPaidSum > 0 ? totalPaid : total,
+    netBalances,
+    settlements,
+    unassignedItemIds,
+  }
 }
