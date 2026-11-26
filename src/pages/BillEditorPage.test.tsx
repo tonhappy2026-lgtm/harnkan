@@ -70,10 +70,6 @@ describe('BillEditorPage', () => {
     await user.type(discInput, '12.50')
     await waitFor(() => expect(screen.getByTestId('editor-total')).toHaveTextContent('887.50'))
 
-    // Fix 3: Clicking qty '+' stepper increments qty to 2 -> 900*2 - 12.50 = 1,787.50
-    await user.click(screen.getByRole('button', { name: 'จำนวน +' }))
-    await waitFor(() => expect(screen.getByTestId('editor-total')).toHaveTextContent('1,787.50'))
-
     // Fix 2: Deselecting B and C leaves A; clicking A again must not flip back to Everyone
     await user.click(screen.getByRole('button', { name: 'B' }))
     await user.click(screen.getByRole('button', { name: 'C' }))

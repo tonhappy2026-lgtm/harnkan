@@ -42,20 +42,6 @@ function MoneyInput({
   )
 }
 
-function QtyStepper({ qty, ariaLabel, onChange }: { qty: number; ariaLabel: string; onChange: (n: number) => void }) {
-  return (
-    <div className="qty-stepper" role="group" aria-label={ariaLabel}>
-      <button type="button" aria-label={`${ariaLabel} -`} onClick={() => onChange(Math.max(1, qty - 1))}>
-        −
-      </button>
-      <span data-testid="item-qty">×{qty}</span>
-      <button type="button" aria-label={`${ariaLabel} +`} onClick={() => onChange(qty + 1)}>
-        +
-      </button>
-    </div>
-  )
-}
-
 export function ItemsSection({ bill, onChange }: { bill: Bill; onChange: (patch: Partial<Bill>) => void }) {
   const t = useT()
 
@@ -113,9 +99,8 @@ export function ItemsSection({ bill, onChange }: { bill: Bill; onChange: (patch:
                 satang={it.unitPrice}
                 placeholder={`${t('editor.price')} (${t('common.baht')})`}
                 ariaLabel={t('editor.price')}
-                onChange={(unitPrice) => updateItem(it.id, { unitPrice })}
+                onChange={(unitPrice, ) => updateItem(it.id, { unitPrice, qty: 1 })}
               />
-              <QtyStepper qty={it.qty} ariaLabel={t('editor.qty')} onChange={(qty) => updateItem(it.id, { qty })} />
               <Button variant="destructive" onClick={() => removeItem(it.id)}>
                 {t('common.delete')}
               </Button>

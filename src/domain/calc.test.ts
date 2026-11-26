@@ -83,10 +83,10 @@ describe('computeBill', () => {
     expect(r.subtotal).toBe(90000)
   })
 
-  test('qty multiplies price', () => {
+  test('multiple items sum correctly', () => {
     const r = computeBill({
       ...base(),
-      items: [{ ...beer, qty: 3 }],
+      items: [beer, { ...beer, id: 'beer2' }, { ...beer, id: 'beer3' }],
       serviceCharge: { enabled: false, percent: 10 },
       vat: { enabled: false, percent: 7, inclusive: false },
     })

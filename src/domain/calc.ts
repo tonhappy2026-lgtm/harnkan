@@ -19,7 +19,7 @@ export function computeBill(bill: Bill): BillResult {
     }
   } else {
     for (const item of bill.items) {
-      const line = Math.max(0, Math.round(item.unitPrice * item.qty))
+      const line = Math.max(0, Math.round(item.unitPrice))
       if (ids.length === 0) {
         rawSubtotal += line
         continue
