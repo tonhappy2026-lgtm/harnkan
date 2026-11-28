@@ -3,7 +3,7 @@ import { newPerson } from '../../domain/factory'
 import { formatBaht, parseBaht, type Satang } from '../../domain/money'
 import type { Bill, Person } from '../../domain/types'
 import { useT } from '../../i18n'
-import { Button, Section } from '../../ui/kit'
+import { Button, Cell, Section, Toggle } from '../../ui/kit'
 
 function PaidInput({
   satang,
@@ -20,7 +20,7 @@ function PaidInput({
   return (
     <input
       className="input input-num input-box"
-      style={{ width: 92 }}
+      style={{ width: 100 }}
       inputMode="decimal"
       placeholder={placeholder}
       aria-label={ariaLabel}
@@ -54,6 +54,7 @@ export function PeopleSection({
 }) {
   const t = useT()
   const [name, setName] = useState('')
+  const [multiPay, setMultiPay] = useState(() => Object.values(bill.paidAmounts ?? {}).some((v) => v > 0))
 
   function addPersonByName(raw: string) {
     const trimmed = raw.trim()
@@ -82,78 +83,94 @@ export function PeopleSection({
   }
 
   function setPersonPaid(personId: string, amount: Satang) {
-    const paidAmounts = { ...(bill.paidAmounts ?? {}), [personId]: amount }
-    onChange({ paidAmounts })
+    onChange({ paidAmounts: { ...(bill.paidAmounts ?? {}), [personId]: amount } })
+  }
+
+  function toggleMultiPay(on: boolean) {
+    setMultiPay(on)
+    if (!on) onChange({ paidAmounts: {} })
   }
 
   const unusedFriends = friends.filter((f) => !bill.people.some((p) => p.id === f.id || p.name === f.name))
 
   return (
-    <Section header={t('editor.people')} footer={bill.people.length > 0 ? t('editor.paidHint') : undefined}>
-      {bill.people.map((p) => {
-        const isPayer = bill.payerId === p.id
-        const paidSatang = bill.paidAmounts?.[p.id] ?? 0
-        return (
-          <div key={p.id} className="cell">
-            <button
-              type="button"
-              className="btn"
-              aria-label={`${t('editor.setPayer')} ${p.name}`}
-              onClick={() => onChange({ payerId: p.id })}
-              style={{ padding: '4px 6px' }}
-            >
-              <span className={isPayer ? 'payer-star' : 'muted'}>{isPayer ? '★' : '☆'}</span>
-            </button>
-            <div className="cell-label">
-              <div>{p.name}</div>
-              {isPayer && <div className="cell-sub">{t('editor.payer')}</div>}
-            </div>
-            <PaidInput
-              satang={paidSatang}
-              placeholder={t('editor.paidAmount')}
-              ariaLabel={`${t('editor.paidAmount')} ${p.name}`}
-              onChange={(amt) => setPersonPaid(p.id, amt)}
-            />
-            <Button variant="destructive" onClick={() => removePerson(p.id)}>
-              {t('common.delete')}
-            </Button>
-          </div>
-        )
-      })}
-      <div className="cell">
-        <input
-          className="input"
-          placeholder={t('editor.personPlaceholder')}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          onBlur={() => {
-            if (name.trim()) addPersonByName(name)
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault()
-              addPersonByName(name)
-            }
-          }}
-        />
-        <Button onClick={() => addPersonByName(name)} disabled={!name.trim()}>
-          {t('editor.addPerson')}
-        </Button>
-      </div>
-      {unusedFriends.length > 0 && (
-        <div className="cell" style={{ flexWrap: 'wrap' }}>
-          <span className="cell-sub" style={{ marginRight: 6 }}>
-            {t('editor.friends')}:
-          </span>
-          <div className="chips">
-            {unusedFriends.map((f) => (
-              <button key={f.id} type="button" className="chip" onClick={() => addFriend(f)}>
-                + {f.name}
+    <>
+      <Section header={t('editor.people')} footer={bill.people.length > 0 ? t('editor.payerHint') : undefined}>
+        {bill.people.map((p) => {
+          const isPayer = bill.payerId === p.id
+          return (
+            <div key={p.id} className="cell">
+              <button
+                type="button"
+                className="btn"
+                aria-label={`${t('editor.setPayer')} ${p.name}`}
+                onClick={() => onChange({ payerId: p.id })}
+                style={{ padding: '4px 8px', fontSize: 22 }}
+              >
+                <span className={isPayer ? 'payer-star' : 'muted'}>{isPayer ? '★' : '☆'}</span>
               </button>
-            ))}
-          </div>
+              <div className="cell-label">
+                <div>{p.name}</div>
+                {isPayer && <div className="cell-sub">{t('editor.payer')}</div>}
+              </div>
+              {multiPay && (
+                <PaidInput
+                  satang={bill.paidAmounts?.[p.id] ?? 0}
+                  placeholder={t('editor.paidAmount')}
+                  ariaLabel={`${t('editor.paidAmount')} ${p.name}`}
+                  onChange={(amt) => setPersonPaid(p.id, amt)}
+                />
+              )}
+              <Button variant="destructive" onClick={() => removePerson(p.id)}>
+                {t('common.delete')}
+              </Button>
+            </div>
+          )
+        })}
+        <div className="cell">
+          <input
+            className="input"
+            placeholder={t('editor.personPlaceholder')}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onBlur={() => {
+              if (name.trim()) addPersonByName(name)
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                addPersonByName(name)
+              }
+            }}
+          />
+          <Button onClick={() => addPersonByName(name)} disabled={!name.trim()}>
+            {t('editor.addPerson')}
+          </Button>
         </div>
+        {unusedFriends.length > 0 && (
+          <div className="cell" style={{ flexWrap: 'wrap' }}>
+            <span className="cell-sub" style={{ marginRight: 6 }}>
+              {t('editor.friends')}:
+            </span>
+            <div className="chips">
+              {unusedFriends.map((f) => (
+                <button key={f.id} type="button" className="chip" onClick={() => addFriend(f)}>
+                  + {f.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </Section>
+
+      {bill.people.length > 1 && (
+        <Section footer={multiPay ? t('editor.paidHint') : undefined}>
+          <Cell
+            label={t('editor.multiPay')}
+            accessory={<Toggle label={t('editor.multiPay')} checked={multiPay} onChange={toggleMultiPay} />}
+          />
+        </Section>
       )}
-    </Section>
+    </>
   )
 }

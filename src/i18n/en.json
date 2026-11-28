@@ -1,6 +1,13 @@
 {
   "app.name": "HarnKan",
   "common.back": "Back",
+  "common.next": "Next",
+  "step.people": "Who",
+  "step.items": "Items",
+  "step.summary": "Summary",
+  "editor.multiPay": "Several people paid upfront",
+  "editor.payerHint": "Tap ★ to choose who paid at the restaurant",
+  "summary.details": "Show all details",
   "common.done": "Done",
   "common.cancel": "Cancel",
   "common.delete": "Delete",

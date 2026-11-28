@@ -80,7 +80,7 @@ describe('BillEditorPage', () => {
     expect(screen.getByRole('button', { name: 'ทุกคน' })).toHaveAttribute('aria-pressed', 'false')
   })
 
-  test('computes total immediately even before adding people, and auto-adds typed person name on blur', async () => {
+  test('step flow: auto-adds typed person on blur, Next goes to items step, total computes', async () => {
     const bill = {
       ...newBill([], { scPercent: 10, vatPercent: 7 }),
       id: 'b2',
@@ -99,15 +99,17 @@ describe('BillEditorPage', () => {
       </I18nProvider>,
     )
 
-    const amountInput = await screen.findByLabelText('ยอดอาหาร (บาท)')
-    await user.type(amountInput, '1000')
-    // 1000 + 10% SC (100) + 7% VAT (77) = 1,177.00 even with 0 people
-    await waitFor(() => expect(screen.getByTestId('editor-total')).toHaveTextContent('1,177.00'))
-
-    // Typing a person name and blurring (tapping elsewhere) auto-adds the person
-    const personInput = screen.getByPlaceholderText('ชื่อ')
+    // No people yet -> starts at step 1; typing a name and blurring auto-adds the person
+    const personInput = await screen.findByPlaceholderText('ชื่อ')
     await user.type(personInput, 'ต้น')
     await user.tab()
     await waitFor(() => expect(screen.getByText('ต้น')).toBeInTheDocument())
+
+    // Next -> items step
+    await user.click(screen.getByRole('button', { name: /ถัดไป/ }))
+    const amountInput = await screen.findByLabelText('ยอดอาหาร (บาท)')
+    await user.type(amountInput, '1000')
+    // 1000 + 10% SC (100) + 7% VAT (77) = 1,177.00
+    await waitFor(() => expect(screen.getByTestId('editor-total')).toHaveTextContent('1,177.00'))
   })
 })

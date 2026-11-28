@@ -1,6 +1,13 @@
 {
   "app.name": "หารกัน",
   "common.back": "กลับ",
+  "common.next": "ถัดไป",
+  "step.people": "ใครไปบ้าง",
+  "step.items": "กินอะไร",
+  "step.summary": "สรุป",
+  "editor.multiPay": "มีหลายคนออกเงินไปก่อน",
+  "editor.payerHint": "แตะ ★ เพื่อเลือกคนที่จ่ายเงินที่ร้าน",
+  "summary.details": "ดูรายละเอียดทั้งหมด",
   "common.done": "เสร็จ",
   "common.cancel": "ยกเลิก",
   "common.delete": "ลบ",

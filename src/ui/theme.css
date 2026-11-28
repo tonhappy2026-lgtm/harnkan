@@ -142,3 +142,35 @@ button.cell:active { background: var(--fill); }
 .share-card h2 { margin: 0 0 4px; font-size: 22px; }
 .share-row { display: flex; justify-content: space-between; padding: 6px 0; font-variant-numeric: tabular-nums; }
 .share-row.total { font-weight: 700; border-top: 0.5px solid var(--sep); margin-top: 6px; padding-top: 10px; }
+
+/* ===== Readability pass: larger text, bigger tap targets ===== */
+:root { font-size: 17px; }
+.page-content { padding: 0 14px; }
+.cell { min-height: 52px; padding: 10px 14px; gap: 10px; }
+.cell-label { font-size: 17px; }
+.cell-sub { font-size: 13px; }
+.cell-value { font-size: 17px; }
+.btn { font-size: 16px; min-height: 44px; padding: 8px 10px; }
+.btn-destructive { font-size: 15px; padding: 8px; }
+.btn-primary { font-size: 17px; min-height: 50px; }
+.input { font-size: 17px; }
+.input-box { padding: 9px 10px; font-size: 17px; }
+.chip { font-size: 15px; padding: 7px 14px; border-radius: 18px; }
+.total-value { font-size: 26px; }
+.section-header { font-size: 13px; }
+.section-footer { font-size: 13px; }
+.share-row { font-size: 17px; }
+
+/* Step bar */
+.steps { display: flex; gap: 6px; margin: 14px 0 4px; }
+.steps button { flex: 1; border: none; border-radius: 12px; padding: 10px 6px; font-size: 14px; font-weight: 600; background: var(--fill); color: var(--label2); }
+.steps button[aria-current='step'] { background: var(--tint); color: #fff; }
+.steps button:disabled { opacity: 0.4; }
+
+/* Summary hero */
+.hero-amount { font-size: 20px; font-weight: 700; color: var(--label); font-variant-numeric: tabular-nums; }
+.cell-lg { min-height: 64px; }
+.cell-lg .cell-value { font-size: 20px; font-weight: 700; color: var(--label); }
+.details > summary { list-style: none; padding: 14px 16px; background: var(--group); border-radius: 12px; color: var(--tint); font-weight: 600; cursor: pointer; text-align: center; }
+.details > summary::-webkit-details-marker { display: none; }
+.details[open] > summary { margin-bottom: 8px; }

@@ -21,6 +21,7 @@ export default function SummaryPage() {
   const [qrDataUrl, setQrDataUrl] = useState<string>('')
   const [copied, setCopied] = useState(false)
   const cardRef = useRef<HTMLDivElement>(null)
+  const detailsRef = useRef<HTMLDetailsElement>(null)
 
   useEffect(() => {
     if (!id) return
@@ -51,9 +52,7 @@ export default function SummaryPage() {
     if (!bill) return
     const key = `${s.fromId}->${s.toId}`
     const already = isSettled(s)
-    const paidIds = already
-      ? bill.paidIds.filter((x) => x !== key && x !== s.fromId)
-      : [...bill.paidIds, key]
+    const paidIds = already ? bill.paidIds.filter((x) => x !== key && x !== s.fromId) : [...bill.paidIds, key]
     const next = { ...bill, paidIds }
     setBill(next)
     await saveBill(next)
@@ -73,7 +72,16 @@ export default function SummaryPage() {
 
   async function handleShareImage() {
     if (!cardRef.current || !bill) return
-    await shareImage(cardRef.current, `harnkan-${bill.id.slice(0, 6)}.png`)
+    // The share card lives inside <details>; open it while capturing so it is actually rendered.
+    const d = detailsRef.current
+    const wasOpen = d?.open ?? true
+    if (d) d.open = true
+    await new Promise((r) => requestAnimationFrame(() => r(null)))
+    try {
+      await shareImage(cardRef.current, `harnkan-${bill.id.slice(0, 6)}.png`)
+    } finally {
+      if (d) d.open = wasOpen
+    }
   }
 
   return (
@@ -84,50 +92,7 @@ export default function SummaryPage() {
         right={<Button onClick={() => nav('/')}>{t('common.done')}</Button>}
       />
       <div className="page-content">
-        <div ref={cardRef} className="share-card">
-          <h2>{bill.title.trim() || t('bills.untitled')}</h2>
-          <div className="cell-sub" style={{ marginBottom: 12 }}>
-            {t('app.name')} · {bill.createdAt.slice(0, 10)}
-          </div>
-          {bill.people.map((p) => {
-            const paidAmt = result.paidByPerson[p.id] ?? 0
-            return (
-              <div key={p.id} className="share-row">
-                <span>
-                  {p.name}{' '}
-                  {paidAmt > 0 && (
-                    <span className="muted">
-                      ({t('summary.alreadyPaid')} {formatBaht(paidAmt)})
-                    </span>
-                  )}
-                </span>
-                <span>{formatBaht(result.shares[p.id] ?? 0)}</span>
-              </div>
-            )
-          })}
-          <div className="share-row total">
-            <span>{t('summary.total')}</span>
-            <span>{formatBaht(result.total)}</span>
-          </div>
-          {result.settlements.length > 0 && (
-            <div style={{ marginTop: 12, paddingTop: 10, borderTop: '0.5px solid var(--sep)' }}>
-              <div className="cell-sub" style={{ marginBottom: 6, fontWeight: 600 }}>
-                {t('summary.settlements')}
-              </div>
-              {result.settlements.map((s) => {
-                const done = isSettled(s)
-                return (
-                  <div key={`${s.fromId}->${s.toId}`} className="share-row">
-                    <span className={done ? 'strike' : ''}>
-                      {t('summary.transferTo', { from: nameOf(s.fromId), to: nameOf(s.toId) })}
-                    </span>
-                    <span className={done ? 'paid' : ''}>{formatBaht(s.amount)}</span>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
+        <h1 className="large-title">{bill.title.trim() || t('bills.untitled')}</h1>
 
         <Section header={t('summary.settlements')} footer={t('summary.tapForQr')}>
           {result.settlements.length === 0 ? (
@@ -138,13 +103,14 @@ export default function SummaryPage() {
               const fromName = nameOf(s.fromId)
               const toName = nameOf(s.toId)
               return (
-                <div key={`${s.fromId}->${s.toId}`} className="cell">
+                <div key={`${s.fromId}->${s.toId}`} className="cell cell-lg">
                   <button
                     type="button"
                     role="checkbox"
                     aria-checked={done}
                     aria-label={`${t('summary.paid')} ${fromName}`}
                     className="check"
+                    style={{ width: 30, height: 30, fontSize: 18 }}
                     onClick={() => toggleSettlementPaid(s)}
                   >
                     {done ? '✓' : ''}
@@ -152,7 +118,7 @@ export default function SummaryPage() {
                   <button
                     type="button"
                     className="btn"
-                    style={{ flex: 1, textAlign: 'left', padding: '4px 0', color: 'inherit' }}
+                    style={{ flex: 1, textAlign: 'left', padding: '4px 0', color: 'inherit', fontSize: 17 }}
                     onClick={() => setQrSettlement(s)}
                   >
                     <div className={done ? 'strike' : ''}>
@@ -160,51 +126,18 @@ export default function SummaryPage() {
                     </div>
                     <div className="cell-sub">{done ? t('summary.paid') : ''}</div>
                   </button>
-                  <div className="cell-value">{formatBaht(s.amount)}</div>
+                  <div className={`cell-value ${done ? 'strike' : ''}`}>{formatBaht(s.amount)}</div>
                 </div>
               )
             })
           )}
-        </Section>
-
-        <Section header={t('summary.perPerson')}>
-          {bill.people.map((p) => {
-            const share = result.shares[p.id] ?? 0
-            const paidAmt = result.paidByPerson[p.id] ?? 0
-            return (
-              <Cell
-                key={p.id}
-                label={p.name}
-                sub={`${t('summary.ate')} ${formatBaht(share)} · ${t('summary.alreadyPaid')} ${formatBaht(paidAmt)}`}
-                value={formatBaht(share)}
-              />
-            )
-          })}
-        </Section>
-
-        <Section>
-          <Cell label={t('summary.subtotal')} value={formatBaht(result.subtotal)} />
-          {result.discount > 0 && <Cell label={t('summary.discount')} value={`-${formatBaht(result.discount)}`} />}
-          {bill.serviceCharge.enabled && (
-            <Cell
-              label={t('summary.serviceCharge', { p: bill.serviceCharge.percent })}
-              value={formatBaht(result.serviceCharge)}
-            />
-          )}
-          {bill.vat.enabled && !bill.vat.inclusive && (
-            <Cell label={t('summary.vat', { p: bill.vat.percent })} value={formatBaht(result.vatAdded)} />
-          )}
-          {bill.vat.enabled && bill.vat.inclusive && (
-            <Cell label={t('summary.vatIncluded', { p: bill.vat.percent })} value={formatBaht(result.vatIncluded)} />
-          )}
-          <Cell label={<strong>{t('summary.total')}</strong>} value={<strong>{formatBaht(result.total)}</strong>} />
           <Cell
             label={t('summary.outstanding')}
-            value={<span data-testid="outstanding-total">{formatBaht(outstanding)}</span>}
+            value={<span className="hero-amount" data-testid="outstanding-total">{formatBaht(outstanding)}</span>}
           />
         </Section>
 
-        <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
+        <div style={{ display: 'flex', gap: 12, margin: '8px 0 16px' }}>
           <Button variant="tinted" style={{ flex: 1 }} onClick={handleCopyText}>
             {copied ? t('summary.copied') : t('summary.copyText')}
           </Button>
@@ -212,6 +145,88 @@ export default function SummaryPage() {
             {t('summary.shareImage')}
           </Button>
         </div>
+
+        <details className="details" ref={detailsRef}>
+          <summary>{t('summary.details')}</summary>
+
+          <Section header={t('summary.perPerson')}>
+            {bill.people.map((p) => {
+              const share = result.shares[p.id] ?? 0
+              const paidAmt = result.paidByPerson[p.id] ?? 0
+              return (
+                <Cell
+                  key={p.id}
+                  label={p.name}
+                  sub={`${t('summary.ate')} ${formatBaht(share)} · ${t('summary.alreadyPaid')} ${formatBaht(paidAmt)}`}
+                  value={formatBaht(share)}
+                />
+              )
+            })}
+          </Section>
+
+          <Section>
+            <Cell label={t('summary.subtotal')} value={formatBaht(result.subtotal)} />
+            {result.discount > 0 && <Cell label={t('summary.discount')} value={`-${formatBaht(result.discount)}`} />}
+            {bill.serviceCharge.enabled && (
+              <Cell
+                label={t('summary.serviceCharge', { p: bill.serviceCharge.percent })}
+                value={formatBaht(result.serviceCharge)}
+              />
+            )}
+            {bill.vat.enabled && !bill.vat.inclusive && (
+              <Cell label={t('summary.vat', { p: bill.vat.percent })} value={formatBaht(result.vatAdded)} />
+            )}
+            {bill.vat.enabled && bill.vat.inclusive && (
+              <Cell label={t('summary.vatIncluded', { p: bill.vat.percent })} value={formatBaht(result.vatIncluded)} />
+            )}
+            <Cell label={<strong>{t('summary.total')}</strong>} value={<strong>{formatBaht(result.total)}</strong>} />
+          </Section>
+
+          <div ref={cardRef} className="share-card">
+            <h2>{bill.title.trim() || t('bills.untitled')}</h2>
+            <div className="cell-sub" style={{ marginBottom: 12 }}>
+              {t('app.name')} · {bill.createdAt.slice(0, 10)}
+            </div>
+            {bill.people.map((p) => {
+              const paidAmt = result.paidByPerson[p.id] ?? 0
+              return (
+                <div key={p.id} className="share-row">
+                  <span>
+                    {p.name}{' '}
+                    {paidAmt > 0 && (
+                      <span className="muted">
+                        ({t('summary.alreadyPaid')} {formatBaht(paidAmt)})
+                      </span>
+                    )}
+                  </span>
+                  <span>{formatBaht(result.shares[p.id] ?? 0)}</span>
+                </div>
+              )
+            })}
+            <div className="share-row total">
+              <span>{t('summary.total')}</span>
+              <span>{formatBaht(result.total)}</span>
+            </div>
+            {result.settlements.length > 0 && (
+              <div style={{ marginTop: 12, paddingTop: 10, borderTop: '0.5px solid var(--sep)' }}>
+                <div className="cell-sub" style={{ marginBottom: 6, fontWeight: 600 }}>
+                  {t('summary.settlements')}
+                </div>
+                {result.settlements.map((s) => {
+                  const done = isSettled(s)
+                  return (
+                    <div key={`${s.fromId}->${s.toId}`} className="share-row">
+                      <span className={done ? 'strike' : ''}>
+                        {t('summary.transferTo', { from: nameOf(s.fromId), to: nameOf(s.toId) })}
+                      </span>
+                      <span className={done ? 'paid' : ''}>{formatBaht(s.amount)}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </details>
       </div>
 
       <Sheet open={qrSettlement !== null} onClose={() => setQrSettlement(null)}>
